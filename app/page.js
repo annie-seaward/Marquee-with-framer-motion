@@ -1,5 +1,11 @@
 "use client";
 
+import { useWindowSize } from "@react-hook/window-size";
+import { useSpring, motion } from "framer-motion";
+import normalizeWheel from "normalize-wheel";
+import { useEffect, useRef } from "react";
+import { useRafLoop } from "react-use";
+
 const _ = {
   speed: 1,
   threshold: 0.014,
@@ -115,8 +121,24 @@ const data4 = [
 ];
 
 export default function Home() {
+  const x = useRef(0);
+  const x2 = useRef(0);
+  const x3 = useRef(0);
+  const x4 = useRef(0);
+
+  const onWheel = (e) => {
+    const normalized = normalizeWheel(e);
+    x.current = normalized.pixelY * _.wheelFactor;
+    x2.current = normalized.pixelY * _.wheelFactor;
+    x3.current = normalized.pixelY * _.wheelFactor;
+    x4.current = normalized.pixelY * _.wheelFactor;
+  };
+
   return (
-    <main className="flex flex-col max-w-screen overflow-x-hidden items-center text-center">
+    <main
+      className="flex flex-col max-w-screen overflow-x-hidden items-center text-center"
+      onWheel={onWheel}
+    >
       {Array.from({ length: 1 }).map((item, index) => (
         <div
           className="h-screen text-[5rem] text-white font-thin w-full flex items-center justify-center bg-black"
@@ -135,6 +157,34 @@ export default function Home() {
           Pacific.
         </span>
       </div>
+      <div className="mt-[10rem]">
+        <div className="mt-[10rem] flex flex-col gap-[30px]">
+          <MarqueeContainer
+            x={x}
+            direction={"left"}
+            springDetails={{ damping: 200, stiffness: 1000, mass: 1 }}
+            cardData={data}
+          />
+          <MarqueeContainer
+            x={x2}
+            direction={"right"}
+            springDetails={{ damping: 200, stiffness: 1000, mass: 1 }}
+            cardData={data2}
+          />
+          <MarqueeContainer
+            x={x3}
+            direction={"left"}
+            springDetails={{ damping: 200, stiffness: 1000, mass: 1 }}
+            cardData={data3}
+          />
+          <MarqueeContainer
+            x={x4}
+            direction={"right"}
+            springDetails={{ damping: 200, stiffness: 1000, mass: 1 }}
+            cardData={data4}
+          />
+        </div>
+      </div>
 
       {Array.from({ length: 2 }).map((item, index) => (
         <div
@@ -147,3 +197,105 @@ export default function Home() {
     </main>
   );
 }
+
+const MarqueeContainer = ({ x, direction, springDetails, cardData }) => {
+  var initialValue = _.speed;
+  if (direction === "right") {
+    initialValue *= -1; //if it is in right, then i am multiplying it with -1 to make it in opposite direction.
+  }
+
+  const speed = useSpring(initialValue, springDetails); //spring hook from Framer Motion, speed motion values
+
+  const loop = () => {
+    if (Math.abs(x.current) < _.threshold) return; // to preserver a minimum speed
+
+    x.current *= 0.66; // so we gradiuallly decrease the speed to a threshold other wise it will infinitley speed
+
+    if (direction === "right") {
+      speed.set((_.speed + x.current) * -1);
+    } else {
+      speed.set(_.speed + x.current);
+    }
+  };
+  useRafLoop(loop, true); //repeatly call loop func\
+
+  return (
+    <motion.div className="flex gap-[30px]">
+      <MarqueeItem speed={speed}>
+        {cardData.map((item, index) => (
+          <Card key={index} item={item} />
+        ))}
+      </MarqueeItem>
+      <MarqueeItem speed={speed}>
+        {cardData.map((item, index) => (
+          <Card key={index} item={item} />
+        ))}
+      </MarqueeItem>
+      <MarqueeItem speed={speed}>
+        {cardData.map((item, index) => (
+          <Card key={index} item={item} />
+        ))}
+      </MarqueeItem>{" "}
+      <MarqueeItem speed={speed}>
+        {cardData.map((item, index) => (
+          <Card key={index} item={item} />
+        ))}
+      </MarqueeItem>
+    </motion.div>
+  );
+};
+
+const MarqueeItem = ({ children, speed }) => {
+  const item = useRef(null); //useRef hook, so it doesn't cause re-render when we update our variables.
+  const rect = useRef({});
+  const x = useRef(0);
+
+  const [width, height] = useWindowSize();
+
+  const setX = () => {
+    if (!item.current || !rect.current) return;
+
+    var xPercentage = (x.current / rect.current.width) * 100;
+    if (xPercentage < -100) x.current = 0;
+    if (xPercentage > 0) x.current = -rect.current.width;
+
+    item.current.style.transform = `translate3d(${xPercentage}%, 0, 0)`;
+  };
+
+  useEffect(() => {
+    rect.current = item.current.getBoundingClientRect();
+  }, [width, height]);
+
+  const loop = (e) => {
+    x.current -= speed.get();
+    setX();
+  };
+
+  useRafLoop(loop, true);
+
+  return (
+    <div
+      className="item shrink-0 flex gap-[40px] items-center  text-white  whitespace-nowrap"
+      ref={item}
+    >
+      {children}
+    </div>
+  );
+};
+
+const Card = ({ item }) => {
+  return (
+    <div className="flex pointer-events-none   shrink-0 justify-center items-center gap-[30px]">
+      <div className="max-h-[104px] rounded-xl relative max-w-[104px] overflow-clip ">
+        <img
+          alt={item.title}
+          src={item.image}
+          className="  h-full w-full min-h-[104px] min-w-[104px] object-cover object-center"
+        />
+      </div>
+      <span className="text-[3rem] font-medium w-full whitespace-nowrap">
+        {item.title}
+      </span>
+    </div>
+  );
+};
